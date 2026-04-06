@@ -48,7 +48,7 @@
 
         <!-- 로딩 표시기 -->
         <div id="loading" class="flex flex-col items-center justify-center py-20">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
             <p class="text-slate-500 font-medium">데이터를 불러오는 중입니다...</p>
         </div>
 
@@ -79,17 +79,17 @@
                 <!-- 평균 거래가격 -->
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                     <h3 class="text-sm font-medium text-slate-500 mb-1">평균 거래가격</h3>
-                    <p class="text-2xl font-bold text-indigo-600" id="summary-avg">0</p>
+                    <p class="text-2xl font-bold text-emerald-600" id="summary-avg">0</p>
                 </div>
                 <!-- 최고 거래가격 -->
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                     <h3 class="text-sm font-medium text-slate-500 mb-1">최고 거래가격</h3>
-                    <p class="text-2xl font-bold text-rose-600" id="summary-max">0</p>
+                    <p class="text-2xl font-bold text-emerald-700" id="summary-max">0</p>
                 </div>
                 <!-- 최저 거래가격 -->
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                     <h3 class="text-sm font-medium text-slate-500 mb-1">최저 거래가격</h3>
-                    <p class="text-2xl font-bold text-teal-600" id="summary-min">0</p>
+                    <p class="text-2xl font-bold text-emerald-500" id="summary-min">0</p>
                 </div>
             </div>
 
@@ -276,11 +276,11 @@
                     datasets: [{
                         label: '월 평균 거래가격 (만원)',
                         data: data,
-                        borderColor: '#4f46e5', // indigo-600
-                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        borderColor: '#059669', // emerald-600
+                        backgroundColor: 'rgba(5, 150, 105, 0.1)',
                         borderWidth: 2,
                         pointBackgroundColor: '#ffffff',
-                        pointBorderColor: '#4f46e5',
+                        pointBorderColor: '#059669',
                         pointBorderWidth: 2,
                         pointRadius: 4,
                         pointHoverRadius: 6,

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>우리 동네 아파트 실거래가 대시보드</title>
+    
+    <!-- Tailwind CSS (스타일링) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js (차트 라이브러리) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- PapaParse (CSV 파싱 라이브러리) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <style>
+        /* 테이블 스크롤바 스타일링 */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- 헤더 -->
+        <header class="mb-8">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+                우리 동네 아파트 실거래가 대시보드 🏢
+            </h1>
+            <p class="mt-2 text-sm text-slate-500">Google Sheets 데이터를 실시간으로 불러와 시각화합니다.</p>
+        </header>
+
+        <!-- 로딩 표시기 -->
+        <div id="loading" class="flex flex-col items-center justify-center py-20">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+            <p class="text-slate-500 font-medium">데이터를 불러오는 중입니다...</p>
+        </div>
+
+        <!-- 에러 메시지 -->
+        <div id="error-message" class="hidden bg-red-50 border-l-4 border-red-400 p-4 mb-8">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-red-700" id="error-text">데이터를 불러오는데 실패했습니다.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 대시보드 컨텐츠 (데이터 로드 후 표시) -->
+        <div id="dashboard-content" class="hidden space-y-8">
+            
+            <!-- 요약 카드 (총 거래, 평균/최고/최저) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- 전체 거래 건수 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 class="text-sm font-medium text-slate-500 mb-1">전체 거래 건수</h3>
+                    <p class="text-3xl font-bold text-slate-900" id="summary-total">0<span class="text-base font-normal text-slate-500 ml-1">건</span></p>
+                </div>
+                <!-- 평균 거래가격 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 class="text-sm font-medium text-slate-500 mb-1">평균 거래가격</h3>
+                    <p class="text-2xl font-bold text-indigo-600" id="summary-avg">0</p>
+                </div>
+                <!-- 최고 거래가격 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 class="text-sm font-medium text-slate-500 mb-1">최고 거래가격</h3>
+                    <p class="text-2xl font-bold text-rose-600" id="summary-max">0</p>
+                </div>
+                <!-- 최저 거래가격 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 class="text-sm font-medium text-slate-500 mb-1">최저 거래가격</h3>
+                    <p class="text-2xl font-bold text-teal-600" id="summary-min">0</p>
+                </div>
+            </div>
+
+            <!-- 차트 영역 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <h2 class="text-lg font-bold text-slate-800 mb-4">월별 평균 거래가격 추이</h2>
+                <div class="relative h-[300px] w-full">
+                    <canvas id="priceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 데이터 테이블 영역 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-6 py-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+                    <h2 class="text-lg font-bold text-slate-800">상세 거래 목록</h2>
+                    <span class="text-xs font-medium bg-slate-100 text-slate-600 py-1 px-3 rounded-full" id="table-count">총 0건</span>
+                </div>
+                <div class="overflow-x-auto custom-scrollbar max-h-[500px]">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50 sticky top-0 shadow-sm z-10">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">거래일자</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">아파트명</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">법정동</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">전용면적(㎡)</th>
+                                <th scope="col" class="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">층</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">거래금액(만원)</th>
+                                <th scope="col" class="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">건축년도</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body" class="bg-white divide-y divide-slate-100 text-sm">
+                            <!-- JS를 통해 데이터가 삽입됩니다 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Google Sheets CSV URL
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZOS4Xkw_PNr7MeZqJMJCBnu8IqoiGmR2kxL8BtWfrdAMRMG0ZoH3rTPiY6EYLzJdm2lF6FLpGup4G/pub?gid=1815946144&single=true&output=csv';
+
+        // DOM 요소
+        const elLoading = document.getElementById('loading');
+        const elContent = document.getElementById('dashboard-content');
+        const elError = document.getElementById('error-message');
+        const elErrorText = document.getElementById('error-text');
+
+        // 숫자만 추출 (콤마 등 제거)
+        const cleanNumber = (str) => {
+            if (str === null || str === undefined) return 0;
+            return Number(String(str).replace(/[^0-9.-]+/g, ""));
+        };
+
+        // 금액 포맷팅 (예: 105000 -> 10억 5,000만원)
+        const formatPrice = (manwon) => {
+            if (manwon === 0) return "-";
+            if (manwon >= 10000) {
+                const uk = Math.floor(manwon / 10000);
+                const man = manwon % 10000;
+                return man > 0 ? `${uk}억 ${man.toLocaleString()}만원` : `${uk}억원`;
+            }
+            return `${manwon.toLocaleString()}만원`;
+        };
+
+        // 데이터 초기화 및 로드
+        function init() {
+            Papa.parse(CSV_URL, {
+                download: true,
+                header: true, // 첫 줄을 키값으로 사용
+                skipEmptyLines: true,
+                transformHeader: function(header) {
+                    return header.trim(); // 헤더 공백 제거
+                },
+                complete: function(results) {
+                    const data = results.data;
+                    if (data && data.length > 0) {
+                        processData(data);
+                        elLoading.classList.add('hidden');
+                        elContent.classList.remove('hidden');
+                    } else {
+                        showError("데이터가 비어있거나 불러올 수 없습니다.");
+                    }
+                },
+                error: function(error) {
+                    console.error("CSV 파싱 에러:", error);
+                    showError("데이터를 가져오는 중 네트워크 오류가 발생했습니다.");
+                }
+            });
+        }
+
+        function showError(msg) {
+            elLoading.classList.add('hidden');
+            elError.classList.remove('hidden');
+            elErrorText.textContent = msg;
+        }
+
+        function processData(data) {
+            let totalTransactions = 0;
+            let prices = [];
+            let monthlyData = {};
+
+            const tableBody = document.getElementById('table-body');
+            tableBody.innerHTML = ''; // 초기화
+
+            data.forEach(row => {
+                // 키워드가 정확히 일치하지 않을 수 있으므로 포함 여부로 유연하게 처리
+                const keyDate = Object.keys(row).find(k => k.includes('일자')) || '거래일자';
+                const keyName = Object.keys(row).find(k => k.includes('아파트')) || '아파트명';
+                const keyDong = Object.keys(row).find(k => k.includes('동')) || '법정동';
+                const keyArea = Object.keys(row).find(k => k.includes('면적')) || '전용면적(㎡)';
+                const keyFloor = Object.keys(row).find(k => k.includes('층')) || '층';
+                const keyPrice = Object.keys(row).find(k => k.includes('금액')) || '거래금액(만원)';
+                const keyYear = Object.keys(row).find(k => k.includes('건축')) || '건축년도';
+
+                const priceStr = row[keyPrice];
+                if (!priceStr) return; // 가격 데이터가 없으면 스킵
+
+                const price = cleanNumber(priceStr);
+                const dateRaw = row[keyDate] || '';
+                
+                prices.push(price);
+                totalTransactions++;
+
+                // 월별 차트 데이터 집계 (YYYY-MM 또는 YYYY.MM 등 추출)
+                const dateMatch = String(dateRaw).match(/(\d{4})[-.\/]?(\d{2})/);
+                if (dateMatch) {
+                    const monthKey = `${dateMatch[1]}-${dateMatch[2]}`; // YYYY-MM
+                    if (!monthlyData[monthKey]) {
+                        monthlyData[monthKey] = { sum: 0, count: 0 };
+                    }
+                    monthlyData[monthKey].sum += price;
+                    monthlyData[monthKey].count += 1;
+                }
+
+                // 테이블 행 생성
+                const tr = document.createElement('tr');
+                tr.classList.add('hover:bg-slate-50', 'transition-colors');
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-slate-500">${dateRaw}</td>
+                    <td class="px-6 py-4 whitespace-nowrap font-medium text-slate-900">${row[keyName] || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-slate-500">${row[keyDong] || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-slate-500 text-right">${row[keyArea] || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-slate-500 text-center">${row[keyFloor] || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap font-semibold text-slate-800 text-right">${formatPrice(price)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-slate-500 text-center">${row[keyYear] || '-'}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            // 요약 통계 계산 및 반영
+            const avgPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : 0;
+            const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+            const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+
+            document.getElementById('summary-total').innerHTML = `${totalTransactions.toLocaleString()}<span class="text-base font-normal text-slate-500 ml-1">건</span>`;
+            document.getElementById('summary-avg').textContent = formatPrice(avgPrice);
+            document.getElementById('summary-max').textContent = formatPrice(maxPrice);
+            document.getElementById('summary-min').textContent = formatPrice(minPrice);
+            document.getElementById('table-count').textContent = `총 ${totalTransactions.toLocaleString()}건`;
+
+            // 차트 렌더링
+            renderChart(monthlyData);
+        }
+
+        function renderChart(monthlyData) {
+            // 월(YYYY-MM) 기준으로 정렬
+            const labels = Object.keys(monthlyData).sort();
+            const data = labels.map(key => Math.round(monthlyData[key].sum / monthlyData[key].count));
+
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+            // 기존 차트가 있다면 파괴 후 재생성 (재실행 대비)
+            if(window.myChart instanceof Chart) {
+                window.myChart.destroy();
+            }
+
+            window.myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '월 평균 거래가격 (만원)',
+                        data: data,
+                        borderColor: '#4f46e5', // indigo-600
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#4f46e5',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        fill: true,
+                        tension: 0.3 // 부드러운 곡선
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false // 범례 숨김
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            padding: 12,
+                            titleFont: { size: 13 },
+                            bodyFont: { size: 14, weight: 'bold' },
+                            callbacks: {
+                                label: function(context) {
+                                    return formatPrice(context.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false,
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#64748b'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: '#f1f5f9',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#64748b',
+                                callback: function(value) {
+                                    // 억 단위로 축약해서 표시 (예: 10000 -> 1억)
+                                    if(value >= 10000) return (value / 10000) + '억';
+                                    return value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index',
+                    },
+                }
+            });
+        }
+
+        // 페이지 로드 시 데이터 가져오기 실행
+        window.addEventListener('DOMContentLoaded', init);
+
+    </script>
+</body>
+</html>
